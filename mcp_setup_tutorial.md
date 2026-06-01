@@ -109,8 +109,8 @@ cp services/mcp-filesystem.service /etc/systemd/system/mcp-filesystem.service
 cp services/mcp-git.service        /etc/systemd/system/mcp-git.service
 ```
 
-> See [`http/fs_server.py`](http/fs_server.py) and [`http/git_server.py`](http/git_server.py) for the full server source code.  
-> See [`services/mcp-filesystem.service`](services/mcp-filesystem.service) and [`services/mcp-git.service`](services/mcp-git.service) for the systemd unit definitions.
+> See [`http/fs_server.py`](./http/fs_server.py) and [`http/git_server.py`](./http/git_server.py) for the full server source code.  
+> See [`services/mcp-filesystem.service`](./services/mcp-filesystem.service) and [`services/mcp-git.service`](./services/mcp-git.service) for the systemd unit definitions.
 
 ---
 
@@ -274,56 +274,56 @@ curl -i -H 'Authorization: Bearer super-long-random-secret' https://mcp.example.
 
 ## 12) Thread Usage
 
-Each conversation thread must use its own `thread_id` following the pattern `thread-<name>`. The `thread_id` is passed explicitly to every tool call — there is no server-side session state.
+Each conversation thread must use its own `thread_id` value such as `project-abc`. The `thread_id` is passed explicitly to every tool call — there is no server-side session state.
 
 ### thread_id rules
 
-- Must match `thread-[A-Za-z0-9][A-Za-z0-9._-]{2,127}`
-- Must start with `thread-`
+- Must match `[A-Za-z0-9][A-Za-z0-9._-]{2,127}`
+- Must be 3 to 128 characters long
 - Reserved names are rejected: `default`, `root`, `tmp`, `test`
-- Thread folders only created by `create_thread()` — never auto-created by file tools
+- Thread folders are only created by `create_thread()` — never auto-created by file tools
 
 ### Typical flow — new repo
 
 ```
 # 1. Create the thread folder (filesystem server)
-create_thread("thread-project-abc")
+create_thread("project-abc")
 
 # 2. Initialize a fresh Git repo (git server)
-git_init_thread_repo("thread-project-abc")
+git_init_thread_repo("project-abc")
 
 # 3. Write files (filesystem server)
-write_file("thread-project-abc", "notes/todo.md", "hello world")
+write_file("project-abc", "notes/todo.md", "hello world")
 
 # 4. Commit (git server)
-git_add("thread-project-abc", ".")
-git_commit("thread-project-abc", "Initial commit")
+git_add("project-abc", ".")
+git_commit("project-abc", "Initial commit")
 ```
 
 ### Typical flow — clone existing repo
 
 ```
 # 1. Create the thread folder (filesystem server)
-create_thread("thread-project-abc")
+create_thread("project-abc")
 
 # 2. Clone an existing remote repo into the thread folder (git server)
-git_clone("thread-project-abc", "https://github.com/example/myrepo.git")
+git_clone("project-abc", "https://github.com/example/myrepo.git")
 
 # 3. Work with files normally (filesystem server)
-read_file("thread-project-abc", "README.md")
-write_file("thread-project-abc", "notes.md", "my notes")
+read_file("project-abc", "README.md")
+write_file("project-abc", "notes.md", "my notes")
 
 # 4. Commit and push (git server)
-git_add("thread-project-abc", ".")
-git_commit("thread-project-abc", "Add notes")
-git_push("thread-project-abc")
+git_add("project-abc", ".")
+git_commit("project-abc", "Add notes")
+git_push("project-abc")
 ```
 
 ### Filesystem on disk
 
 ```
 $MCP_THREADS_ROOT/          (default: /srv/ai-share)
-└── thread-project-abc/
+└── project-abc/
     ├── .git/
     └── notes/
         └── todo.md
@@ -380,7 +380,7 @@ sudo -u mcp ssh -T git@github.com
 
 The API key value must match the token stored in `/etc/haproxy/mcp-api-key`.
 
-> **Note:** Perplexity does not support automatic `thread_id` injection. Always pass an explicit `thread_id` matching the `thread-<name>` pattern in every tool call.
+> **Note:** Perplexity does not support automatic `thread_id` injection. Always pass an explicit `thread_id` such as `project-abc` in every tool call.
 
 ---
 
@@ -412,7 +412,7 @@ pct start 231
 7. Add HAProxy frontend routing and backend auth
 8. Validate config with `haproxy -c`
 9. Reload HAProxy and test with `curl`
-10. Use `create_thread("thread-<name>")` before any file or Git operation
+10. Use `create_thread("your-name")` before any file or Git operation
 11. Convert the container to a Proxmox template
 
 ---
@@ -421,7 +421,7 @@ pct start 231
 
 ### Filesystem tools (`/fs`)
 
-> Source: [`http/fs_server.py`](http/fs_server.py)
+> Source: [`http/fs_server.py`](./http/fs_server.py)
 
 | Tool | Required params | Optional params |
 |------|----------------|-----------------|
@@ -437,7 +437,7 @@ pct start 231
 
 ### Git tools (`/git`)
 
-> Source: [`http/git_server.py`](http/git_server.py)
+> Source: [`http/git_server.py`](./http/git_server.py)
 
 | Tool | Required params | Optional params |
 |------|----------------|-----------------|

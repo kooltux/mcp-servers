@@ -9,7 +9,7 @@ ROOT_BASE = Path(_root_env).resolve()
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "9001"))
 
-THREAD_ID_RE = re.compile(r"^thread-[A-Za-z0-9][A-Za-z0-9._-]{2,127}$")
+THREAD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$")
 RESERVED_THREAD_IDS = {"default", "root", "tmp", "test"}
 
 mcp = FastMCP("filesystem", host=HOST, port=PORT)
@@ -24,8 +24,8 @@ def validate_thread_id(thread_id: str) -> str:
         raise ValueError("invalid thread_id")
     if not THREAD_ID_RE.fullmatch(thread_id):
         raise ValueError(
-            "invalid thread_id: must start with 'thread-' and then use "
-            "letters, numbers, dot, underscore, or hyphen"
+            "invalid thread_id: must start with a letter or digit and then use "
+            "letters, numbers, dot, underscore, or hyphen (3-128 chars total)"
         )
     return thread_id
 
