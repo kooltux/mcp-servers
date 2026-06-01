@@ -9,6 +9,7 @@ Group=mcp
 WorkingDirectory=/opt/mcp/http
 Environment="HOST=0.0.0.0"
 Environment="PORT=9001"
+Environment="MCP_THREADS_ROOT=/srv/ai-share"
 ExecStart=/opt/mcp/http/venv/bin/python /opt/mcp/http/fs_server.py
 Restart=always
 RestartSec=3

@@ -16,7 +16,7 @@ This tutorial documents a complete setup of two remote MCP servers accessible vi
 - Bearer token authentication enforced in HAProxy backends
 - Perplexity connects via remote MCP URLs over HTTPS (Streamable HTTP)
 - Thread-level isolation via explicit `thread_id` parameter on every tool call
-- Thread folders live under `/srv/ai-share/threads/<thread_id>/`
+- Thread root directory configured via the `MCP_THREADS_ROOT` environment variable
 
 ---
 
@@ -69,12 +69,12 @@ apt install -y \
 useradd --system --create-home --home-dir /var/lib/mcp --shell /usr/sbin/nologin mcp || true
 
 mkdir -p /opt/mcp/http
-mkdir -p /srv/ai-share/threads
+mkdir -p /srv/ai-share
 chown -R mcp:mcp /opt/mcp /srv/ai-share /var/lib/mcp
 chmod 0750 /srv/ai-share
 ```
 
-> **Note:** The old single-repo at `/srv/ai-share` is no longer used. Each conversation thread gets its own folder under `/srv/ai-share/threads/<thread_id>/` and its own Git repo initialized on demand.
+> **Note:** The default threads root is `/srv/ai-share`. This path is configurable via the `MCP_THREADS_ROOT` environment variable in the systemd service files.
 
 ---
 
@@ -99,7 +99,8 @@ import re
 import shutil
 from mcp.server.fastmcp import FastMCP
 
-ROOT_BASE = Path("/srv/ai-share/threads").resolve()
+_root_env = os.environ.get("MCP_THREADS_ROOT", "/srv/ai-share")
+ROOT_BASE = Path(_root_env).resolve()
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "9001"))
 
@@ -119,7 +120,8 @@ def validate_thread_id(thread_id: str) -> str:
         raise ValueError("invalid thread_id")
     if not THREAD_ID_RE.fullmatch(thread_id):
         raise ValueError(
-            "invalid thread_id: must start with 'thread-' and then use letters, numbers, dot, underscore, or hyphen"
+            "invalid thread_id: must start with 'thread-' and then use "
+            "letters, numbers, dot, underscore, or hyphen"
         )
     return thread_id
 
@@ -250,7 +252,8 @@ import re
 import subprocess
 from mcp.server.fastmcp import FastMCP
 
-ROOT_BASE = Path("/srv/ai-share/threads").resolve()
+_root_env = os.environ.get("MCP_THREADS_ROOT", "/srv/ai-share")
+ROOT_BASE = Path(_root_env).resolve()
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "9002"))
 DEFAULT_BRANCH = os.environ.get("GIT_DEFAULT_BRANCH", "main")
@@ -273,7 +276,8 @@ def validate_thread_id(thread_id: str) -> str:
         raise ValueError("invalid thread_id")
     if not THREAD_ID_RE.fullmatch(thread_id):
         raise ValueError(
-            "invalid thread_id: must start with 'thread-' and then use letters, numbers, dot, underscore, or hyphen"
+            "invalid thread_id: must start with 'thread-' and then use "
+            "letters, numbers, dot, underscore, or hyphen"
         )
     return thread_id
 
@@ -320,8 +324,7 @@ def set_git_identity(repo: Path) -> None:
     ):
         result = subprocess.run(
             ["git", "-C", str(repo), "config", key, value],
-            capture_output=True,
-            text=True,
+            capture_output=True, text=True,
         )
         if result.returncode != 0:
             raise ValueError(result.stderr.strip() or f"git config {key} failed")
@@ -336,16 +339,13 @@ def list_threads() -> list[str]:
 @mcp.tool()
 def git_init_thread_repo(thread_id: str) -> str:
     repo = require_existing_thread_repo_dir(thread_id)
-
     if not (repo / ".git").is_dir():
         result = subprocess.run(
             ["git", "-C", str(repo), "init", "-b", DEFAULT_BRANCH],
-            capture_output=True,
-            text=True,
+            capture_output=True, text=True,
         )
         if result.returncode != 0:
             raise ValueError(result.stderr.strip() or "git init failed")
-
     set_git_identity(repo)
     return f"initialized git repo in {repo}"
 
@@ -353,7 +353,6 @@ def git_init_thread_repo(thread_id: str) -> str:
 @mcp.tool()
 def git_clone(thread_id: str, url: str) -> str:
     repo = get_thread_repo(thread_id)
-
     if not repo.exists():
         raise ValueError(
             f"thread '{thread_id}' does not exist; call create_thread on the filesystem server first"
@@ -364,15 +363,12 @@ def git_clone(thread_id: str, url: str) -> str:
         raise ValueError(
             f"thread '{thread_id}' already contains a git repo; use git_pull to update it"
         )
-
     result = subprocess.run(
         ["git", "clone", "--", url, str(repo)],
-        capture_output=True,
-        text=True,
+        capture_output=True, text=True,
     )
     if result.returncode != 0:
         raise ValueError(result.stderr.strip() or "git clone failed")
-
     set_git_identity(repo)
     return f"cloned {url} into {repo}"
 
@@ -448,6 +444,7 @@ Group=mcp
 WorkingDirectory=/opt/mcp/http
 Environment="HOST=0.0.0.0"
 Environment="PORT=9001"
+Environment="MCP_THREADS_ROOT=/srv/ai-share"
 ExecStart=/opt/mcp/http/venv/bin/python /opt/mcp/http/fs_server.py
 Restart=always
 RestartSec=3
@@ -470,6 +467,10 @@ Group=mcp
 WorkingDirectory=/opt/mcp/http
 Environment="HOST=0.0.0.0"
 Environment="PORT=9002"
+Environment="MCP_THREADS_ROOT=/srv/ai-share"
+Environment="GIT_DEFAULT_BRANCH=main"
+Environment="GIT_USER_NAME=MCP Bot"
+Environment="GIT_USER_EMAIL=mcp-bot@example.net"
 ExecStart=/opt/mcp/http/venv/bin/python /opt/mcp/http/git_server.py
 Restart=always
 RestartSec=3
@@ -477,6 +478,8 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 ```
+
+> **To change the threads root path**, update `MCP_THREADS_ROOT` in both service files, create the new directory, set ownership to `mcp:mcp`, then run `systemctl daemon-reload` and restart both services.
 
 Enable and start:
 
@@ -612,7 +615,27 @@ curl -i -H 'Authorization: Bearer super-long-random-secret' https://mcp.example.
 
 ---
 
-## 12) Thread Usage
+## 12) Environment Variables Reference
+
+### Common to both servers
+
+| Variable | Default | Description |
+|---|---|---|
+| `MCP_THREADS_ROOT` | `/srv/ai-share` | Absolute path to the threads root directory |
+| `HOST` | `0.0.0.0` | Bind address |
+| `PORT` | `9001` (fs) / `9002` (git) | Bind port |
+
+### Git server only
+
+| Variable | Default | Description |
+|---|---|---|
+| `GIT_DEFAULT_BRANCH` | `main` | Default branch name used by `git init` and `git pull/push` |
+| `GIT_USER_NAME` | `MCP Bot` | Git committer name set in each repo's local config |
+| `GIT_USER_EMAIL` | `mcp-bot@example.net` | Git committer email set in each repo's local config |
+
+---
+
+## 13) Thread Usage
 
 Each conversation thread must use its own `thread_id` following the pattern `thread-<name>`. The `thread_id` is passed explicitly to every tool call — there is no server-side session state.
 
@@ -662,20 +685,16 @@ git_push("thread-project-abc")
 ### Filesystem on disk
 
 ```
-/srv/ai-share/
-└── threads/
-    ├── thread-project-abc/
-    │   ├── .git/
-    │   └── notes/
-    │       └── todo.md
-    └── thread-another-project/
-        ├── .git/
-        └── ...
+$MCP_THREADS_ROOT/          (default: /srv/ai-share)
+└── thread-project-abc/
+    ├── .git/
+    └── notes/
+        └── todo.md
 ```
 
 ---
 
-## 13) Optional Firewall Hardening (nftables)
+## 14) Optional Firewall Hardening (nftables)
 
 Restrict backend ports so only HAProxy can reach them. Replace `10.0.0.10` with your HAProxy container IP:
 
@@ -703,7 +722,7 @@ nft list ruleset
 
 ---
 
-## 14) Optional Git over SSH
+## 15) Optional Git over SSH
 
 ```bash
 sudo -u mcp mkdir -p /var/lib/mcp/.ssh
@@ -715,7 +734,7 @@ sudo -u mcp ssh -T git@github.com
 
 ---
 
-## 15) Perplexity Connector Settings
+## 16) Perplexity Connector Settings
 
 | Connector  | URL                            | Auth    | Transport       |
 |------------|--------------------------------|---------|-----------------|
@@ -728,7 +747,7 @@ The API key value must match the token stored in `/etc/haproxy/mcp-api-key`.
 
 ---
 
-## 16) Convert Container to Proxmox Template
+## 17) Convert Container to Proxmox Template
 
 ```bash
 pct shutdown 230
@@ -749,10 +768,10 @@ pct start 231
 
 1. Create Debian 13 LXC
 2. Install base packages
-3. Create `mcp` user and `/srv/ai-share/threads`
+3. Create `mcp` user and `/srv/ai-share`
 4. Install Python MCP environment
 5. Create `fs_server.py` and `git_server.py`
-6. Create and enable systemd services
+6. Create and enable systemd services (set `MCP_THREADS_ROOT` in each)
 7. Add HAProxy frontend routing and backend auth
 8. Validate config with `haproxy -c`
 9. Reload HAProxy and test with `curl`
