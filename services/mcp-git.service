@@ -1,0 +1,17 @@
+[Unit]
+Description=MCP Git Server
+After=network.target
+
+[Service]
+Type=simple
+User=mcp
+Group=mcp
+WorkingDirectory=/opt/mcp/http
+Environment="HOST=0.0.0.0"
+Environment="PORT=9002"
+ExecStart=/opt/mcp/http/venv/bin/python /opt/mcp/http/git_server.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
