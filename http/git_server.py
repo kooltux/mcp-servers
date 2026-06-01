@@ -54,7 +54,7 @@ def require_existing_thread_repo_dir(thread_id: str) -> Path:
 def ensure_git_repo(repo: Path) -> None:
     if not (repo / ".git").is_dir():
         raise ValueError(
-            "git repo not initialized for this thread; call git_init_thread_repo first"
+            "git repo not initialized for this thread; call git_init_thread_repo or git_clone first"
         )
 
 
@@ -65,6 +65,20 @@ def run_git(repo: Path, args: list[str]) -> str:
     if result.returncode != 0:
         raise ValueError(result.stderr.strip() or "git command failed")
     return result.stdout.strip()
+
+
+def set_git_identity(repo: Path) -> None:
+    for key, value in (
+        ("user.name", GIT_USER_NAME),
+        ("user.email", GIT_USER_EMAIL),
+    ):
+        result = subprocess.run(
+            ["git", "-C", str(repo), "config", key, value],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise ValueError(result.stderr.strip() or f"git config {key} failed")
 
 
 @mcp.tool()
@@ -86,19 +100,35 @@ def git_init_thread_repo(thread_id: str) -> str:
         if result.returncode != 0:
             raise ValueError(result.stderr.strip() or "git init failed")
 
-    for key, value in (
-        ("user.name", GIT_USER_NAME),
-        ("user.email", GIT_USER_EMAIL),
-    ):
-        result = subprocess.run(
-            ["git", "-C", str(repo), "config", key, value],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            raise ValueError(result.stderr.strip() or f"git config {key} failed")
-
+    set_git_identity(repo)
     return f"initialized git repo in {repo}"
+
+
+@mcp.tool()
+def git_clone(thread_id: str, url: str) -> str:
+    repo = get_thread_repo(thread_id)
+
+    if not repo.exists():
+        raise ValueError(
+            f"thread '{thread_id}' does not exist; call create_thread on the filesystem server first"
+        )
+    if not repo.is_dir():
+        raise ValueError("thread repo path is not a directory")
+    if (repo / ".git").is_dir():
+        raise ValueError(
+            f"thread '{thread_id}' already contains a git repo; use git_pull to update it"
+        )
+
+    result = subprocess.run(
+        ["git", "clone", "--", url, str(repo)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise ValueError(result.stderr.strip() or "git clone failed")
+
+    set_git_identity(repo)
+    return f"cloned {url} into {repo}"
 
 
 @mcp.tool()

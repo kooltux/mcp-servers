@@ -300,7 +300,7 @@ def require_existing_thread_repo_dir(thread_id: str) -> Path:
 def ensure_git_repo(repo: Path) -> None:
     if not (repo / ".git").is_dir():
         raise ValueError(
-            "git repo not initialized for this thread; call git_init_thread_repo first"
+            "git repo not initialized for this thread; call git_init_thread_repo or git_clone first"
         )
 
 
@@ -311,6 +311,20 @@ def run_git(repo: Path, args: list[str]) -> str:
     if result.returncode != 0:
         raise ValueError(result.stderr.strip() or "git command failed")
     return result.stdout.strip()
+
+
+def set_git_identity(repo: Path) -> None:
+    for key, value in (
+        ("user.name", GIT_USER_NAME),
+        ("user.email", GIT_USER_EMAIL),
+    ):
+        result = subprocess.run(
+            ["git", "-C", str(repo), "config", key, value],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise ValueError(result.stderr.strip() or f"git config {key} failed")
 
 
 @mcp.tool()
@@ -332,19 +346,35 @@ def git_init_thread_repo(thread_id: str) -> str:
         if result.returncode != 0:
             raise ValueError(result.stderr.strip() or "git init failed")
 
-    for key, value in (
-        ("user.name", GIT_USER_NAME),
-        ("user.email", GIT_USER_EMAIL),
-    ):
-        result = subprocess.run(
-            ["git", "-C", str(repo), "config", key, value],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            raise ValueError(result.stderr.strip() or f"git config {key} failed")
-
+    set_git_identity(repo)
     return f"initialized git repo in {repo}"
+
+
+@mcp.tool()
+def git_clone(thread_id: str, url: str) -> str:
+    repo = get_thread_repo(thread_id)
+
+    if not repo.exists():
+        raise ValueError(
+            f"thread '{thread_id}' does not exist; call create_thread on the filesystem server first"
+        )
+    if not repo.is_dir():
+        raise ValueError("thread repo path is not a directory")
+    if (repo / ".git").is_dir():
+        raise ValueError(
+            f"thread '{thread_id}' already contains a git repo; use git_pull to update it"
+        )
+
+    result = subprocess.run(
+        ["git", "clone", "--", url, str(repo)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise ValueError(result.stderr.strip() or "git clone failed")
+
+    set_git_identity(repo)
+    return f"cloned {url} into {repo}"
 
 
 @mcp.tool()
@@ -593,13 +623,13 @@ Each conversation thread must use its own `thread_id` following the pattern `thr
 - Reserved names are rejected: `default`, `root`, `tmp`, `test`
 - Thread folders only created by `create_thread()` — never auto-created by file tools
 
-### Typical flow
+### Typical flow — new repo
 
 ```
 # 1. Create the thread folder (filesystem server)
 create_thread("thread-project-abc")
 
-# 2. Initialize a Git repo (git server)
+# 2. Initialize a fresh Git repo (git server)
 git_init_thread_repo("thread-project-abc")
 
 # 3. Write files (filesystem server)
@@ -608,6 +638,25 @@ write_file("thread-project-abc", "notes/todo.md", "hello world")
 # 4. Commit (git server)
 git_add("thread-project-abc", ".")
 git_commit("thread-project-abc", "Initial commit")
+```
+
+### Typical flow — clone existing repo
+
+```
+# 1. Create the thread folder (filesystem server)
+create_thread("thread-project-abc")
+
+# 2. Clone an existing remote repo into the thread folder (git server)
+git_clone("thread-project-abc", "https://github.com/example/myrepo.git")
+
+# 3. Work with files normally (filesystem server)
+read_file("thread-project-abc", "README.md")
+write_file("thread-project-abc", "notes.md", "my notes")
+
+# 4. Commit and push (git server)
+git_add("thread-project-abc", ".")
+git_commit("thread-project-abc", "Add notes")
+git_push("thread-project-abc")
 ```
 
 ### Filesystem on disk
@@ -734,6 +783,7 @@ pct start 231
 |------|----------------|-----------------|
 | `list_threads` | — | — |
 | `git_init_thread_repo` | `thread_id` | — |
+| `git_clone` | `thread_id`, `url` | — |
 | `git_status` | `thread_id` | — |
 | `git_log` | `thread_id` | `max_count` (default `10`) |
 | `git_diff` | `thread_id` | `ref` (default `HEAD`) |
