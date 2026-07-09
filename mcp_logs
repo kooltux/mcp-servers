@@ -1,0 +1,30 @@
+#!/bin/bash
+
+LOGDIR=/var/log/mcp
+
+[[ $# -eq 0 ]] && services="filesystem git"
+
+logs=
+
+case $1 in
+	-h|--help)
+		echo "Usage: $0 [all | <service> <service> ...]"
+		;;
+	all)
+		logs=$LOGDIR/*.log
+		;;
+	"")
+		;;
+	*)
+		services="$@"
+		;;
+esac
+
+[[ -z "$logs" ]] && {
+	for x in $services; do 
+		logs="$logs $LOGDIR/$x.log"
+	done
+}
+
+echo tail -f $logs
+
