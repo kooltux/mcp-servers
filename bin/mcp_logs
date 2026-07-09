@@ -26,5 +26,5 @@ esac
 	done
 }
 
-echo tail -f $logs
+tail -F $logs
 
