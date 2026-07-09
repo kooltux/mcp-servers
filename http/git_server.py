@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 import re
 import subprocess
-from lib.logging_utils import configure_http_access_logger, log_http_access, log_http_access_request, log_tool_call
+from lib.logging_utils import configure_http_access_logger, log_http_access, log_tool_call
 from mcp.server.fastmcp import FastMCP
 
 _root_env = os.environ.get("MCP_THREADS_ROOT", "/srv/ai-share")

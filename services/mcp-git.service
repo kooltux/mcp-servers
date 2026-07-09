@@ -19,9 +19,7 @@ Environment="GIT_USER_EMAIL=mcp-bot@example.net"
 ExecStart=/opt/mcp/http/venv/bin/python /opt/mcp/http/git_server.py
 Restart=always
 RestartSec=3
-#StandardOutput=null
-#StandardError=null
-ReadWritePaths=/var/log/mcp /srv/ai-share
+##ReadWritePaths=/var/log/mcp /srv/ai-share
 UMask=0027
 
 [Install]

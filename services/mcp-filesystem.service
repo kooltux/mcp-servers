@@ -16,9 +16,7 @@ Environment="MCP_HTTP_ACCESS_LOG_NAME=http-access"
 ExecStart=/opt/mcp/http/venv/bin/python /opt/mcp/http/fs_server.py
 Restart=always
 RestartSec=3
-#StandardOutput=null
-#StandardError=null
-ReadWritePaths=/var/log/mcp /srv/ai-share
+##ReadWritePaths=/var/log/mcp /srv/ai-share
 UMask=0027
 
 [Install]

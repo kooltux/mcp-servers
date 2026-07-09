@@ -135,3 +135,83 @@ def append_http_access_log(message: str) -> None:
 
 def log_http_access_request(tool: str, params: str) -> None:
     append_http_access_log(f"tool={tool} params={params}")
+def configure_http_access_logger() -> logging.Logger:
+    level = getattr(logging, os.environ.get("HTTP_ACCESS_LOG_LEVEL", os.environ.get("LOG_LEVEL", "INFO")).upper(), logging.INFO)
+    logger = logging.getLogger("mcp.http_access")
+    logger.setLevel(level)
+    logger.propagate = False
+    logger.handlers = []
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+    _ensure_handler(logger, HTTP_ACCESS_LOG_NAME, formatter, level, add_context_filter=False)
+    return logger
+
+
+def configure_http_access_logger() -> logging.Logger:
+    level = getattr(logging, os.environ.get("HTTP_ACCESS_LOG_LEVEL", os.environ.get("LOG_LEVEL", "INFO")).upper(), logging.INFO)
+    logger = logging.getLogger("mcp.http_access")
+    logger.setLevel(level)
+    logger.propagate = False
+    logger.handlers = []
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+    _ensure_handler(logger, HTTP_ACCESS_LOG_NAME, formatter, level, add_context_filter=False)
+    return logger
+
+
+def _serialize_value(value: Any) -> Any:
+    if isinstance(value, str):
+        if len(value) > 500:
+            return f"<str len={len(value)}>"
+        return value
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, (list, tuple)):
+        return [_serialize_value(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _serialize_value(v) for k, v in value.items()}
+    return value
+
+
+def safe_params(fn: Callable[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
+    names = fn.__code__.co_varnames[:fn.__code__.co_argcount]
+    params = dict(zip(names, args))
+    params.update(kwargs)
+    redacted = {}
+    for key, value in params.items():
+        if key.lower() in {"content", "token", "password", "secret"}:
+            if isinstance(value, str):
+                redacted[key] = f"<redacted len={len(value)}>"
+            else:
+                redacted[key] = "<redacted>"
+        else:
+            redacted[key] = _serialize_value(value)
+    return json.dumps(redacted, ensure_ascii=False, default=str)
+
+
+def log_tool_call(connector: str):
+    logger = get_connector_logger(connector)
+
+    def decorator(fn: Callable[..., Any]):
+        @wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any):
+            params = safe_params(fn, args, kwargs)
+            logger.info(
+                "mcp_request",
+                extra={"connector": connector, "tool": fn.__name__, "params": params},
+            )
+            try:
+                return fn(*args, **kwargs)
+            except Exception:
+                logger.exception(
+                    "mcp_request_failed",
+                    extra={"connector": connector, "tool": fn.__name__, "params": params},
+                )
+                raise
+
+        return wrapper
+
+    return decorator
+
+
+def log_http_access(message: str) -> None:
+    logger = logging.getLogger("mcp.http_access")
+    logger.info(message)
