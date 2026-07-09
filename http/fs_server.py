@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 import re
 import shutil
-from lib.logging_utils import log_tool_call
+from lib.logging_utils import configure_http_access_logger, log_tool_call
 from mcp.server.fastmcp import FastMCP
 
 _root_env = os.environ.get("MCP_THREADS_ROOT", "/srv/ai-share")
@@ -14,6 +14,8 @@ THREAD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$")
 RESERVED_THREAD_IDS = {"default", "root", "tmp", "test"}
 
 mcp = FastMCP("filesystem", host=HOST, port=PORT)
+
+configure_http_access_logger()
 
 
 def validate_thread_id(thread_id: str) -> str:
