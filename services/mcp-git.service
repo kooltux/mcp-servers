@@ -11,6 +11,7 @@ Environment="HOST=0.0.0.0"
 Environment="PORT=9002"
 Environment="MCP_THREADS_ROOT=/srv/ai-share"
 Environment="MCP_LOG_DIR=/var/log/mcp"
+LogsDirectory=mcp
 Environment="MCP_HTTP_ACCESS_LOG_NAME=http-access"
 Environment="GIT_DEFAULT_BRANCH=main"
 Environment="GIT_USER_NAME=MCP Bot"
