@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 import re
 import shutil
+from lib.logging_utils import log_tool_call
 from mcp.server.fastmcp import FastMCP
 
 _root_env = os.environ.get("MCP_THREADS_ROOT", "/srv/ai-share")
@@ -13,6 +14,7 @@ THREAD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{2,127}$")
 RESERVED_THREAD_IDS = {"default", "root", "tmp", "test"}
 
 mcp = FastMCP("filesystem", host=HOST, port=PORT)
+
 
 def validate_thread_id(thread_id: str) -> str:
     thread_id = thread_id.strip()
@@ -52,11 +54,13 @@ def safe_path(thread_id: str, p: str) -> Path:
     return candidate
 
 @mcp.tool()
+@log_tool_call("filesystem")
 def list_threads() -> list[str]:
     ROOT_BASE.mkdir(parents=True, exist_ok=True)
     return sorted([p.name for p in ROOT_BASE.iterdir() if p.is_dir()])
 
 @mcp.tool()
+@log_tool_call("filesystem")
 def create_thread(thread_id: str) -> str:
     root = get_thread_root(thread_id)
     if root.exists():
@@ -67,6 +71,7 @@ def create_thread(thread_id: str) -> str:
     return f"created thread directory {root}"
 
 @mcp.tool()
+@log_tool_call("filesystem")
 def delete_thread(thread_id: str, recursive: bool = False) -> str:
     root = require_existing_thread_root(thread_id)
     if recursive:
@@ -76,11 +81,13 @@ def delete_thread(thread_id: str, recursive: bool = False) -> str:
     return f"deleted thread directory {root}"
 
 @mcp.tool()
+@log_tool_call("filesystem")
 def list_allowed_directories(thread_id: str) -> list[str]:
     root = require_existing_thread_root(thread_id)
     return [str(root)]
 
 @mcp.tool()
+@log_tool_call("filesystem")
 def list_directory(thread_id: str, path: str = ".") -> list[str]:
     p = safe_path(thread_id, path)
     if not p.exists():
@@ -90,6 +97,7 @@ def list_directory(thread_id: str, path: str = ".") -> list[str]:
     return sorted(x.name for x in p.iterdir())
 
 @mcp.tool()
+@log_tool_call("filesystem")
 def read_file(thread_id: str, path: str) -> str:
     p = safe_path(thread_id, path)
     if not p.is_file():
@@ -97,6 +105,7 @@ def read_file(thread_id: str, path: str) -> str:
     return p.read_text(encoding="utf-8")
 
 @mcp.tool()
+@log_tool_call("filesystem")
 def write_file(thread_id: str, path: str, content: str) -> str:
     p = safe_path(thread_id, path)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -104,12 +113,14 @@ def write_file(thread_id: str, path: str, content: str) -> str:
     return f"wrote {p}"
 
 @mcp.tool()
+@log_tool_call("filesystem")
 def create_directory(thread_id: str, path: str) -> str:
     p = safe_path(thread_id, path)
     p.mkdir(parents=True, exist_ok=True)
     return f"created {p}"
 
 @mcp.tool()
+@log_tool_call("filesystem")
 def delete_path(thread_id: str, path: str, recursive: bool = False) -> str:
     p = safe_path(thread_id, path)
     if not p.exists():
