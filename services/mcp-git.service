@@ -11,12 +11,15 @@ Environment="HOST=0.0.0.0"
 Environment="PORT=9002"
 Environment="MCP_THREADS_ROOT=/srv/ai-share"
 Environment="MCP_LOG_DIR=/var/log/mcp"
+Environment="MCP_HTTP_ACCESS_LOG_NAME=http-access"
 Environment="GIT_DEFAULT_BRANCH=main"
 Environment="GIT_USER_NAME=MCP Bot"
 Environment="GIT_USER_EMAIL=mcp-bot@example.net"
 ExecStart=/opt/mcp/http/venv/bin/python /opt/mcp/http/git_server.py
 Restart=always
 RestartSec=3
+StandardOutput=null
+StandardError=null
 ReadWritePaths=/var/log/mcp /srv/ai-share
 UMask=0027
 
