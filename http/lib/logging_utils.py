@@ -61,6 +61,8 @@ def configure_http_access_logger() -> logging.Logger:
     logger.handlers = []
     formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
     _ensure_handler(logger, HTTP_ACCESS_LOG_NAME, formatter, level, add_context_filter=False)
+    access_path = LOG_DIR / f"{HTTP_ACCESS_LOG_NAME}.log"
+    access_path.touch(exist_ok=True)
     return logger
 
 
