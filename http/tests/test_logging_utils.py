@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:
 _tmpdir = tempfile.TemporaryDirectory()
 os.environ["MCP_LOG_DIR"] = _tmpdir.name
 
-from lib.logging_utils import configure_http_access_logger, get_connector_logger, log_http_access, safe_params
+from lib.logging_utils import configure_http_access_logger, get_connector_logger, log_http_access, log_http_access_request, safe_params
 
 
 def sample_tool(thread_id, path, content, retries=0):
@@ -67,9 +67,18 @@ def test_log_http_access_writes_message():
     assert 'request received' in content
     assert content.strip() != ''
 
+
+def test_log_http_access_request_writes_tool_entry():
+    log_http_access_request('read_file', '{"path":"a.txt"}')
+    access_path = Path(_tmpdir.name) / 'http-access.log'
+    content = access_path.read_text(encoding='utf-8')
+    assert 'tool=read_file' in content
+    assert 'params={"path":"a.txt"}' in content
+
 if __name__ == '__main__':
     test_safe_params_redacts_content_and_serializes_values()
     test_get_connector_logger_writes_to_connector_log_file()
     test_configure_http_access_logger_writes_access_log_file()
     test_log_http_access_writes_message()
+    test_log_http_access_request_writes_tool_entry()
     print('ok')
