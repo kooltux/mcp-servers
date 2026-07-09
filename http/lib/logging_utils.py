@@ -63,7 +63,7 @@ def configure_http_access_logger() -> logging.Logger:
     _ensure_handler(logger, HTTP_ACCESS_LOG_NAME, formatter, level, add_context_filter=False)
     access_path = LOG_DIR / f"{HTTP_ACCESS_LOG_NAME}.log"
     access_path.touch(exist_ok=True)
-    append_http_access_log("access logger ready")
+    logger.info("access logger ready")
     return logger
 
 
@@ -123,18 +123,10 @@ def log_tool_call(connector: str):
 
 
 def log_http_access(message: str) -> None:
-    append_http_access_log(message)
+    logger = logging.getLogger("mcp.http_access")
+    logger.info(message)
 
 
-def append_http_access_log(message: str) -> None:
-    _ensure_log_dir()
-    path = LOG_DIR / f"{HTTP_ACCESS_LOG_NAME}.log"
-    with path.open("a", encoding="utf-8") as f:
-        f.write(message.rstrip() + "\n")
-
-
-def log_http_access_request(tool: str, params: str) -> None:
-    append_http_access_log(f"tool={tool} params={params}")
 def configure_http_access_logger() -> logging.Logger:
     level = getattr(logging, os.environ.get("HTTP_ACCESS_LOG_LEVEL", os.environ.get("LOG_LEVEL", "INFO")).upper(), logging.INFO)
     logger = logging.getLogger("mcp.http_access")
