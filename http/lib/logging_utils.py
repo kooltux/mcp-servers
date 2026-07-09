@@ -8,8 +8,9 @@ import os
 from typing import Any, Callable
 
 
-LOG_DIR = Path(os.environ.get("MCP_LOG_DIR", "/opt/mcp/logs"))
+LOG_DIR = Path(os.environ.get("MCP_LOG_DIR", "/var/log/mcp"))
 LOG_FORMAT = "%(asctime)s %(levelname)s connector=%(connector)s tool=%(tool)s params=%(params)s message=%(message)s"
+HTTP_ACCESS_LOG_NAME = os.environ.get("MCP_HTTP_ACCESS_LOG_NAME", "http-access")
 
 
 class MCPContextFilter(logging.Filter):
@@ -23,26 +24,43 @@ class MCPContextFilter(logging.Filter):
         return True
 
 
-def _ensure_handler(logger: logging.Logger, connector: str) -> None:
-    log_dir = LOG_DIR
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / f"{connector}.log"
+def _ensure_log_dir() -> Path:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    return LOG_DIR
+
+
+def _ensure_handler(logger: logging.Logger, log_name: str, formatter: logging.Formatter, level: int, add_context_filter: bool = True) -> None:
+    log_dir = _ensure_log_dir()
+    log_path = log_dir / f"{log_name}.log"
     target = str(log_path.resolve())
     for handler in logger.handlers:
-        if isinstance(handler, logging.FileHandler) and getattr(handler, 'baseFilename', None) == target:
+        if isinstance(handler, logging.FileHandler) and getattr(handler, "baseFilename", None) == target:
             return
     handler = logging.FileHandler(log_path)
-    handler.setLevel(getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO))
-    handler.setFormatter(logging.Formatter(LOG_FORMAT))
-    handler.addFilter(MCPContextFilter())
+    handler.setLevel(level)
+    handler.setFormatter(formatter)
+    if add_context_filter:
+        handler.addFilter(MCPContextFilter())
     logger.addHandler(handler)
 
 
 def get_connector_logger(connector: str) -> logging.Logger:
+    level = getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO)
     logger = logging.getLogger(f"mcp.{connector}")
-    logger.setLevel(getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO))
+    logger.setLevel(level)
     logger.propagate = False
-    _ensure_handler(logger, connector)
+    _ensure_handler(logger, connector, logging.Formatter(LOG_FORMAT), level)
+    return logger
+
+
+def configure_http_access_logger() -> logging.Logger:
+    level = getattr(logging, os.environ.get("HTTP_ACCESS_LOG_LEVEL", os.environ.get("LOG_LEVEL", "INFO")).upper(), logging.INFO)
+    logger = logging.getLogger("uvicorn.access")
+    logger.setLevel(level)
+    logger.propagate = False
+    logger.handlers = []
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+    _ensure_handler(logger, HTTP_ACCESS_LOG_NAME, formatter, level, add_context_filter=False)
     return logger
 
 

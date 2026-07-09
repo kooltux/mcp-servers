@@ -10,9 +10,12 @@ WorkingDirectory=/opt/mcp/http
 Environment="HOST=0.0.0.0"
 Environment="PORT=9001"
 Environment="MCP_THREADS_ROOT=/srv/ai-share"
+Environment="MCP_LOG_DIR=/var/log/mcp"
 ExecStart=/opt/mcp/http/venv/bin/python /opt/mcp/http/fs_server.py
 Restart=always
 RestartSec=3
+ReadWritePaths=/var/log/mcp /srv/ai-share
+UMask=0027
 
 [Install]
 WantedBy=multi-user.target
