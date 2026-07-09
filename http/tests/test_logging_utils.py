@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:
 _tmpdir = tempfile.TemporaryDirectory()
 os.environ["MCP_LOG_DIR"] = _tmpdir.name
 
-from lib.logging_utils import configure_http_access_logger, get_connector_logger, log_http_access, safe_params
+from lib.logging_utils import configure_http_access_logger, get_connector_logger, safe_params
 
 
 def sample_tool(thread_id, path, content, retries=0):
@@ -43,22 +43,23 @@ def test_connector_logger_writes_timestamped_log_file():
     content = log_path.read_text(encoding="utf-8")
     assert "connector=filesystem" in content
     assert "tool=read_file" in content
-    assert "params={"path":"a.txt"}" in content
+    assert 'params={"path":"a.txt"}' in content
+    assert content[:4].isdigit()
 
 
-def test_http_access_logger_writes_timestamped_message():
+def test_http_access_logger_uses_separate_file_handler():
     logger = configure_http_access_logger()
-    log_http_access("mcp server starting")
+    logger.info("127.0.0.1 - GET / HTTP/1.1 200")
     for handler in logger.handlers:
         handler.flush()
     access_path = Path(_tmpdir.name) / "http-access.log"
     content = access_path.read_text(encoding="utf-8")
-    assert "mcp server starting" in content
+    assert "GET / HTTP/1.1 200" in content
     assert content[:4].isdigit()
 
 
 if __name__ == '__main__':
     test_safe_params_redacts_content_and_serializes_values()
     test_connector_logger_writes_timestamped_log_file()
-    test_http_access_logger_writes_timestamped_message()
+    test_http_access_logger_uses_separate_file_handler()
     print('ok')

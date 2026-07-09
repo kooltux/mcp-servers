@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 import re
 import subprocess
-from lib.logging_utils import configure_http_access_logger, log_http_access, log_tool_call
+from lib.logging_utils import configure_http_access_logger, log_tool_call
 from mcp.server.fastmcp import FastMCP
 
 _root_env = os.environ.get("MCP_THREADS_ROOT", "/srv/ai-share")
@@ -172,5 +172,4 @@ def git_push(thread_id: str, remote: str = "origin", branch: str = DEFAULT_BRANC
 
 if __name__ == "__main__":
     ROOT_BASE.mkdir(parents=True, exist_ok=True)
-    log_http_access("mcp server starting")
     mcp.run(transport="streamable-http")
