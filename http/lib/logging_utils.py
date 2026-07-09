@@ -63,6 +63,7 @@ def configure_http_access_logger() -> logging.Logger:
     _ensure_handler(logger, HTTP_ACCESS_LOG_NAME, formatter, level, add_context_filter=False)
     access_path = LOG_DIR / f"{HTTP_ACCESS_LOG_NAME}.log"
     access_path.touch(exist_ok=True)
+    logger.info("access logger ready")
     return logger
 
 
@@ -119,3 +120,8 @@ def log_tool_call(connector: str):
         return wrapper
 
     return decorator
+
+
+def log_http_access(message: str) -> None:
+    logger = logging.getLogger("uvicorn.access")
+    logger.info(message)
