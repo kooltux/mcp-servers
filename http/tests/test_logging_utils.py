@@ -1,12 +1,17 @@
 import json
+import os
 from pathlib import Path
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from lib.logging_utils import safe_params
+_tmpdir = tempfile.TemporaryDirectory()
+os.environ["MCP_LOG_DIR"] = _tmpdir.name
+
+from lib.logging_utils import get_connector_logger, safe_params
 
 
 def sample_tool(thread_id, path, content, retries=0):
@@ -26,6 +31,23 @@ def test_safe_params_redacts_content_and_serializes_values():
     assert data["retries"] == 2
 
 
+def test_get_connector_logger_writes_to_connector_log_file():
+    logger = get_connector_logger("filesystem")
+    logger.info(
+        "mcp_request",
+        extra={"connector": "filesystem", "tool": "read_file", "params": '{"path":"a.txt"}'},
+    )
+    for handler in logger.handlers:
+        handler.flush()
+    log_path = Path(_tmpdir.name) / "filesystem.log"
+    assert log_path.exists()
+    content = log_path.read_text(encoding="utf-8")
+    assert "connector=filesystem" in content
+    assert "tool=read_file" in content
+    assert 'params={"path":"a.txt"}' in content
+
+
 if __name__ == '__main__':
     test_safe_params_redacts_content_and_serializes_values()
+    test_get_connector_logger_writes_to_connector_log_file()
     print('ok')

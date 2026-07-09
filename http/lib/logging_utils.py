@@ -8,13 +8,41 @@ import os
 from typing import Any, Callable
 
 
+LOG_DIR = Path(os.environ.get("MCP_LOG_DIR", "/opt/mcp/logs"))
+LOG_FORMAT = "%(asctime)s %(levelname)s connector=%(connector)s tool=%(tool)s params=%(params)s message=%(message)s"
+
+
+class MCPContextFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not hasattr(record, "connector"):
+            record.connector = "unknown"
+        if not hasattr(record, "tool"):
+            record.tool = "-"
+        if not hasattr(record, "params"):
+            record.params = "{}"
+        return True
+
+
+def _ensure_handler(logger: logging.Logger, connector: str) -> None:
+    log_dir = LOG_DIR
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / f"{connector}.log"
+    target = str(log_path.resolve())
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler) and getattr(handler, 'baseFilename', None) == target:
+            return
+    handler = logging.FileHandler(log_path)
+    handler.setLevel(getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO))
+    handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    handler.addFilter(MCPContextFilter())
+    logger.addHandler(handler)
+
+
 def get_connector_logger(connector: str) -> logging.Logger:
     logger = logging.getLogger(f"mcp.{connector}")
-    if not logging.getLogger().handlers:
-        logging.basicConfig(
-            level=os.environ.get("LOG_LEVEL", "INFO"),
-            format="%(asctime)s %(levelname)s connector=%(connector)s tool=%(tool)s params=%(params)s message=%(message)s",
-        )
+    logger.setLevel(getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO))
+    logger.propagate = False
+    _ensure_handler(logger, connector)
     return logger
 
 
