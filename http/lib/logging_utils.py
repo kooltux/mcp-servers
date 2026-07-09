@@ -133,5 +133,4 @@ def append_http_access_log(message: str) -> None:
     _ensure_log_dir()
     path = LOG_DIR / f"{HTTP_ACCESS_LOG_NAME}.log"
     with path.open("a", encoding="utf-8") as f:
-        f.write(message.rstrip() + "
-")
+        f.write(message.rstrip() + "\n")
