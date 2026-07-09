@@ -64,6 +64,7 @@ def configure_http_access_logger() -> logging.Logger:
     access_path = LOG_DIR / f"{HTTP_ACCESS_LOG_NAME}.log"
     access_path.touch(exist_ok=True)
     logger.info("access logger ready")
+    append_http_access_log("access logger ready")
     return logger
 
 
@@ -125,3 +126,12 @@ def log_tool_call(connector: str):
 def log_http_access(message: str) -> None:
     logger = logging.getLogger("uvicorn.access")
     logger.info(message)
+    append_http_access_log(message)
+
+
+def append_http_access_log(message: str) -> None:
+    _ensure_log_dir()
+    path = LOG_DIR / f"{HTTP_ACCESS_LOG_NAME}.log"
+    with path.open("a", encoding="utf-8") as f:
+        f.write(message.rstrip() + "
+")

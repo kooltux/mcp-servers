@@ -65,6 +65,7 @@ def test_log_http_access_writes_message():
     assert access_path.exists()
     content = access_path.read_text(encoding='utf-8')
     assert 'request received' in content
+    assert content.strip() != ''
 
 if __name__ == '__main__':
     test_safe_params_redacts_content_and_serializes_values()
