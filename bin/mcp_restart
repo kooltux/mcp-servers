@@ -1,0 +1,13 @@
+#!//bin/bash -x
+
+systemctl stop mcp-git.service
+systemctl stop mcp-filesystem.service
+systemctl stop 'srv-ai\x2dshare.mount'
+systemctl stop 'srv-ai\x2dshare\x2draw.mount'
+
+systemctl daemon-reload
+
+systemctl start 'srv-ai\x2dshare\x2draw.mount'
+systemctl start 'srv-ai\x2dshare.mount'
+systemctl start mcp-filesystem.service
+systemctl start mcp-git.service
